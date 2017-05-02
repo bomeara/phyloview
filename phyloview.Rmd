@@ -38,7 +38,7 @@ if(!require("knitr")){
 clade.name <- rphylotastic::ResolveNamesWithOToL(params$clade)
 id <- ott_id(tnrs_match_names(clade.name))
 node.info <- tol_node_info(id)
-relevant.studies <- studies_find_studies(property="ot:focalCladeOTTTaxonName", value=clade.name)
+relevant.studies <- studies_find_trees(property="ot:ottTaxonName", value=clade.name)
 tree.info <- data.frame()
 all.trees <- list_trees(relevant.studies)
 for (study.index in sequence(nrow(relevant.studies))) {
@@ -63,13 +63,13 @@ genbank.species.count <-  entrez_search(db="taxonomy", genbank.species.query, us
 Taxon **`r clade.name`** has `r node.info$num_tips` terminal taxa in OpenTree. This is based on taxonomy plus `r nrow(relevant.studies)` studies.
 
 
-```{r echo=FALSE}
+```{r, echo=FALSE}
 kable(tree.info, caption="Supporting studies in OpenTree (if any)")
 ```
 
 In GenBank, there are `r genbank.species.count` species listed for this group.
 
-```{r echo=FALSE}
+```{r, echo=FALSE}
 focal.genes <- c("COI", "18S", "28S", "matk", "rbcl")
 GetNucCount <- function(gene, taxon=clade.name) {
   gene.query <- paste0(taxon, '[organism] AND ',gene)
@@ -79,4 +79,12 @@ GetNucCount <- function(gene, taxon=clade.name) {
 gene.count <- sapply(focal.genes, GetNucCount, taxon=clade.name) #make sure not to do mclapply or similar lest you violate NCBI terms of service
 #print(gene.count)
 kable(data.frame(seqs=gene.count), caption="Number of sequences in GenBank")
+```
+
+```{r, echo=FALSE}
+pubmed.query <- paste0(clade.name, ' AND phylogeny')
+pubmed.result <- entrez_search(db="pubmed", pubmed.query, use_history=TRUE)
+pubmed.df <- data.frame(Date=extract_from_esummary(pubmed.summaries, elements=c("sortpubdate")), FirstAuthor=extract_from_esummary(pubmed.summaries, elements=c("sortfirstauthor")), Journal=extract_from_esummary(pubmed.summaries, elements=c("fulljournalname")), Title=extract_from_esummary(pubmed.summaries, elements=c("title")))
+pubmed.df <- pubmed.df[order(pubmed.df$Date, decreasing=TRUE),]
+kable(pubmed.df, caption="Publications")
 ```
