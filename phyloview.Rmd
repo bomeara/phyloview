@@ -43,12 +43,18 @@ tree.info <- data.frame()
 all.trees <- list_trees(relevant.studies)
 for (study.index in sequence(nrow(relevant.studies))) {
   for (tree.index in sequence(length(all.trees[study.index]))) {
-    phy <- get_study_tree(study_id=relevant.studies$study_ids[study.index], tree_id = all.trees[[study.index]][tree.index])
-    local.result <- data.frame(Year=relevant.studies$study_year[study.index], Ntax=Ntip(phy), Title=relevant.studies$title[study.index], DOI=relevant.studies$study_doi[study.index])
-    if(nrow(tree.info)==0) {
-      tree.info <- local.result
-    } else {
-      tree.info <- rbind(tree.info, local.result)
+    phy <- NULL
+    try(phy <- get_study_tree(study_id=relevant.studies$study_ids[study.index], tree_id = all.trees[[study.index]][tree.index]))
+    if(!is.null(phy)) {
+      local.result <- NULL
+      try(local.result <- data.frame(Year=relevant.studies$study_year[study.index], Ntax=Ntip(phy), Title=relevant.studies$title[study.index], DOI=relevant.studies$study_doi[study.index]))
+      if(!is.null(local.result)) {
+        if(nrow(tree.info)==0) {
+          tree.info <- local.result
+        } else {
+          tree.info <- rbind(tree.info, local.result)
+        }
+      }
     }
   }
 }
@@ -86,6 +92,8 @@ pubmed.query <- paste0(clade.name, ' AND phylogeny')
 pubmed.result <- entrez_search(db="pubmed", pubmed.query, use_history=TRUE)
 pubmed.summaries <- entrez_summary(db="pubmed", web_history=pubmed.result$web_history)
 pubmed.df <- data.frame(Date=extract_from_esummary(pubmed.summaries, elements=c("sortpubdate")), FirstAuthor=extract_from_esummary(pubmed.summaries, elements=c("sortfirstauthor")), Journal=extract_from_esummary(pubmed.summaries, elements=c("fulljournalname")), Title=extract_from_esummary(pubmed.summaries, elements=c("title")))
-pubmed.df <- pubmed.df[order(pubmed.df$Date, decreasing=TRUE),]
-kable(pubmed.df, caption="Publications")
+if(nrow(pubmed.df)>0) {
+  pubmed.df <- pubmed.df[order(pubmed.df$Date, decreasing=TRUE),]
+  kable(pubmed.df, caption="Publications")
+}
 ```
