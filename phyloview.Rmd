@@ -84,6 +84,7 @@ kable(data.frame(seqs=gene.count), caption="Number of sequences in GenBank")
 ```{r, echo=FALSE}
 pubmed.query <- paste0(clade.name, ' AND phylogeny')
 pubmed.result <- entrez_search(db="pubmed", pubmed.query, use_history=TRUE)
+pubmed.summaries <- entrez_summary(db="pubmed", web_history=pubmed.result$web_history)
 pubmed.df <- data.frame(Date=extract_from_esummary(pubmed.summaries, elements=c("sortpubdate")), FirstAuthor=extract_from_esummary(pubmed.summaries, elements=c("sortfirstauthor")), Journal=extract_from_esummary(pubmed.summaries, elements=c("fulljournalname")), Title=extract_from_esummary(pubmed.summaries, elements=c("title")))
 pubmed.df <- pubmed.df[order(pubmed.df$Date, decreasing=TRUE),]
 kable(pubmed.df, caption="Publications")
