@@ -1,6 +1,6 @@
 ---
 title: "PhyloView"
-output: html_document
+output: pdf_document
 params:
   clade: formicidae
 ---
@@ -24,6 +24,10 @@ if(!require("ape")){
     install.packages("ape")
     library(ape)
 }
+if(!require("pander")){
+    install.packages("pander")
+    library(pander)
+}
 if(!require("rentrez")){
     install.packages("rentrez")
     library(rentrez)
@@ -35,27 +39,32 @@ if(!require("knitr")){
 ```
 
 ```{r, include=FALSE, echo=FALSE}
-clade.name <- rphylotastic::ResolveNamesWithOToL(params$clade)
-id <- ott_id(tnrs_match_names(clade.name))
+clade.info <- tnrs_match_names(params$clade)
+clade.name <- clade.info$unique_name[1]
+id <- clade.info$ott_id[1]
 node.info <- tol_node_info(id)
 relevant.studies <- studies_find_trees(property="ot:ottTaxonName", value=clade.name)
 tree.info <- data.frame()
 all.trees <- list_trees(relevant.studies)
 for (study.index in sequence(nrow(relevant.studies))) {
+  study.info <- get_publication(get_study_meta(relevant.studies$study_ids[study.index]))
   for (tree.index in sequence(length(all.trees[study.index]))) {
     phy <- NULL
-    try(phy <- get_study_tree(study_id=relevant.studies$study_ids[study.index], tree_id = all.trees[[study.index]][tree.index]))
+    try(phy <- get_study_tree(study_id=relevant.studies$study_ids[study.index], tree_id = gsub('tree/', '',all.trees[[study.index]][tree.index])))
+    local.result <- NULL
     if(!is.null(phy)) {
-      local.result <- NULL
-      try(local.result <- data.frame(Year=relevant.studies$study_year[study.index], Ntax=Ntip(phy), Title=relevant.studies$title[study.index], DOI=relevant.studies$study_doi[study.index]))
-      if(!is.null(local.result)) {
-        if(nrow(tree.info)==0) {
-          tree.info <- local.result
-        } else {
-          tree.info <- rbind(tree.info, local.result)
-        }
+      try(local.result <- data.frame(Year=relevant.studies$study_year[study.index], Ntax=Ntip(phy), Pub=study.info[1], DOI=attr(study.info, "DOI")))
+    } else {
+      try(local.result <- data.frame(Year=relevant.studies$study_year[study.index], Ntax=NA, Pub=study.info[1], DOI=attr(study.info, "DOI")))
+    }
+    if(!is.null(local.result)) {
+      if(nrow(tree.info)==0) {
+        tree.info <- local.result
+      } else {
+        tree.info <- rbind(tree.info, local.result)
       }
     }
+
   }
 }
 ```
@@ -65,13 +74,18 @@ genbank.species.query <- paste0(clade.name, '[subtree] AND species[rank] AND spe
 genbank.species.count <-  entrez_search(db="taxonomy", genbank.species.query, use_history=TRUE)$count
 ```
 
+This was created using https://github.com/bomeara/phyloview. It utilizes the `rotl`, `rentrez`, `ape`, `kable`, `rmarkdown`, and `knitr` packages.
+
+## OpenTree
 
 Taxon **`r clade.name`** has `r node.info$num_tips` terminal taxa in OpenTree. This is based on taxonomy plus `r nrow(relevant.studies)` studies.
 
 
 ```{r, echo=FALSE}
-kable(tree.info, caption="Supporting studies in OpenTree (if any)")
+pander(tree.info, split.table = Inf)
 ```
+
+## GenBank
 
 In GenBank, there are `r genbank.species.count` species listed for this group.
 
@@ -84,16 +98,24 @@ GetNucCount <- function(gene, taxon=clade.name) {
 }
 gene.count <- sapply(focal.genes, GetNucCount, taxon=clade.name) #make sure not to do mclapply or similar lest you violate NCBI terms of service
 #print(gene.count)
-kable(data.frame(seqs=gene.count), caption="Number of sequences in GenBank")
+pander(data.frame(seqs=gene.count))
 ```
 
 ```{r, echo=FALSE}
 pubmed.query <- paste0(clade.name, ' AND phylogeny')
 pubmed.result <- entrez_search(db="pubmed", pubmed.query, use_history=TRUE)
-pubmed.summaries <- entrez_summary(db="pubmed", web_history=pubmed.result$web_history)
-pubmed.df <- data.frame(Date=extract_from_esummary(pubmed.summaries, elements=c("sortpubdate")), FirstAuthor=extract_from_esummary(pubmed.summaries, elements=c("sortfirstauthor")), Journal=extract_from_esummary(pubmed.summaries, elements=c("fulljournalname")), Title=extract_from_esummary(pubmed.summaries, elements=c("title")))
+```
+
+## PubMed
+
+There are `r pubmed.result$count` articles that match `r clade.name` AND phylogeny on PubMed. Here are the 20 most recent.
+
+```{r, echo=FALSE}
+pubmed.summaries <- entrez_summary(db="pubmed", id=pubmed.result$id)
+pubmed.df <- data.frame(Date=extract_from_esummary(pubmed.summaries, elements=c("sortpubdate")), FirstAuthor=extract_from_esummary(pubmed.summaries, elements=c("sortfirstauthor")), Journal=extract_from_esummary(pubmed.summaries, elements=c("fulljournalname")), Title=extract_from_esummary(pubmed.summaries, elements=c("title")), row.names=NULL)
 if(nrow(pubmed.df)>0) {
   pubmed.df <- pubmed.df[order(pubmed.df$Date, decreasing=TRUE),]
-  kable(pubmed.df, caption="Publications")
+  pander(pubmed.df, split.table = Inf)
 }
+
 ```
